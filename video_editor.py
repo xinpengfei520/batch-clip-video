@@ -25,19 +25,31 @@ def create_video_from_images(image_dir, audio_path, output_dir="output"):
         # 处理每张图片
         for img_file in batch_files:
             img_path = os.path.join(image_dir, img_file)
+            
             # 创建图片剪辑
-            clip = ImageClip(img_path).set_duration(2)
+            clip = ImageClip(img_path)
             
-            # 添加缩放动画
-            w, h = clip.size
-            def resize_func(t):
-                scale = 1 + (0.2 * t/2)  # 在0-2秒内从100%缩放到120%
-                new_w = int(w * scale)
+            # 设置持续时间和缩放动画
+            def make_frame(t):
+                # 计算当前时间点的缩放比例
+                scale = 1 + (0.2 * t/2)  # 2秒内从1.0变到1.2
+                frame = clip.get_frame(0)  # 获取原始帧
+                
+                # 计算新的尺寸（等比缩放）
+                h, w = frame.shape[:2]
                 new_h = int(h * scale)
-                return (new_w, new_h)
+                new_w = int(w * scale)
+                
+                # 居中裁剪，保持原始尺寸
+                resized = np.array(Image.fromarray(frame).resize((new_w, new_h), Image.Resampling.LANCZOS))
+                y_offset = (new_h - h) // 2
+                x_offset = (new_w - w) // 2
+                
+                return resized[y_offset:y_offset+h, x_offset:x_offset+w]
             
-            clip = clip.resize(resize_func)
-            clips.append(clip)
+            # 创建新的视频片段
+            animated_clip = VideoClip(make_frame, duration=2)
+            clips.append(animated_clip)
         
         # 连接所有剪辑
         final_clip = concatenate_videoclips(clips)
